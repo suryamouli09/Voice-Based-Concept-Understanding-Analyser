@@ -1,0 +1,26 @@
+{
+    "Machine Learning": {
+        "description": "Machine Learning is a branch of Artificial Intelligence.",
+        "reference_text": "Machine Learning is a branch of Artificial Intelligence that enables computers to learn from data without being explicitly programmed. It uses algorithms to recognize patterns, make predictions, and improve performance through experience."
+    },
+
+    "Cloud Computing": {
+        "description": "Cloud Computing provides computing services over the internet.",
+        "reference_text": "Cloud Computing is the delivery of computing services including servers, storage, databases, networking, and software over the Internet. It provides scalability, flexibility, and cost-effective access to computing resources."
+    },
+
+    "Artificial Intelligence": {
+        "description": "Artificial Intelligence simulates human intelligence.",
+        "reference_text": "Artificial Intelligence is the simulation of human intelligence in machines. AI enables systems to learn, reason, solve problems, understand language, and make decisions similarly to humans."
+    },
+
+    "Data Science": {
+        "description": "Data Science extracts insights from data.",
+        "reference_text": "Data Science combines statistics, machine learning, programming, and domain knowledge to analyze data, discover patterns, and support decision-making."
+    },
+
+    "Operating System": {
+        "description": "Operating System manages hardware and software.",
+        "reference_text": "An Operating System is system software that manages computer hardware, software resources, memory, processes, files, and provides an interface between users and the computer."
+    }
+}
