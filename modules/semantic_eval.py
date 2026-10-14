@@ -1,27 +1,37 @@
+import streamlit as st
 from sentence_transformers import SentenceTransformer, util
 
-# Load model once
-model = SentenceTransformer("all-MiniLM-L6-v2")
+@st.cache_resource(show_spinner="Loading Sentence-BERT Semantic Encoder...")
+def _load_sentence_model():
+    """Load and cache SentenceTransformer model."""
+    return SentenceTransformer("all-MiniLM-L6-v2")
 
+def semantic_similarity(user_text: str, reference_text: str) -> dict:
+    """
+    Computes cosine similarity between user's spoken explanation and benchmark text.
+    """
+    if not user_text.strip():
+        return {
+            "Similarity": 0.0,
+            "Level": "Insufficient Explanation"
+        }
 
-def semantic_similarity(user_text, reference_text):
+    model = _load_sentence_model()
 
     emb1 = model.encode(user_text, convert_to_tensor=True)
-
     emb2 = model.encode(reference_text, convert_to_tensor=True)
 
-    score = util.cos_sim(emb1, emb2).item()
-
-    similarity = round(score * 100, 2)
+    raw_score = util.cos_sim(emb1, emb2).item()
+    similarity = max(0.0, min(100.0, round(float(raw_score) * 100, 2)))
 
     if similarity >= 80:
-        level = "🟢 Strong Understanding"
-
+        level = "Strong Conceptual Alignment"
     elif similarity >= 60:
-        level = "🟡 Moderate Understanding"
-
+        level = "Moderate Understanding"
+    elif similarity >= 40:
+        level = "Partial Understanding"
     else:
-        level = "🔴 Poor Understanding"
+        level = "Needs Significant Improvement"
 
     return {
         "Similarity": similarity,

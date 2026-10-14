@@ -7,29 +7,28 @@ __pycache__/
 # Virtual Environment
 .venv/
 venv/
+env/
 
-# Streamlit
-.streamlit/
+# Streamlit secrets (track config.toml for dark theme, ignore secrets)
+.streamlit/secrets.toml
 
-# VS Code
-.vscode/
-
-# Output Files
+# Outputs & Reports
 outputs/reports/*.pdf
 outputs/transcripts/*.txt
 
-# Audio Uploads
-uploads/
+# User Uploads
+uploads/*
+!uploads/.gitkeep
 
-# Logs
+# Database (ignore local sqlite database)
+database/*.db
+
+# Logs & Cache
 *.log
-
-# OS Files
-.DS_Store
-Thumbs.db
-
-# Python cache
+.cache/
 .pytest_cache/
 
-# Model cache
-.cache/
+# VS Code & OS
+.vscode/
+.DS_Store
+Thumbs.db

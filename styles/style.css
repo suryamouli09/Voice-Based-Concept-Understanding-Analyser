@@ -1,0 +1,180 @@
+/* ==========================================================================
+   VBCUA MODERN AI PLATFORM STYLESHEET
+   Clean, Professional, Enterprise-Grade UI
+   ========================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@500;600;700;800&display=swap');
+
+/* Global Reset & Typography */
+html, body, [class*="css"] {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+h1, h2, h3, h4, h5, h6 {
+    font-family: 'Outfit', sans-serif !important;
+    font-weight: 700 !important;
+    letter-spacing: -0.02em !important;
+}
+
+/* Remove default footer/menu padding gaps */
+footer {
+    display: none !important;
+}
+
+/* Top App Header Banner */
+.app-header {
+    background: linear-gradient(135deg, #111827 0%, #1E293B 100%);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 16px;
+    padding: 1.8rem 2rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+    position: relative;
+    overflow: hidden;
+}
+
+.app-header::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #3B82F6, #8B5CF6, #10B981);
+}
+
+.header-badge {
+    display: inline-block;
+    background: rgba(59, 130, 246, 0.15);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    color: #60A5FA;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 3px 10px;
+    border-radius: 12px;
+    margin-bottom: 0.6rem;
+}
+
+.header-title {
+    font-size: 1.9rem;
+    font-weight: 800;
+    color: #F9FAFB;
+    margin: 0 0 0.4rem 0;
+    line-height: 1.2;
+}
+
+.header-subtitle {
+    font-size: 0.95rem;
+    color: #9CA3AF;
+    margin: 0;
+    line-height: 1.5;
+}
+
+/* Performance Tier Badges */
+.tier-badge {
+    display: inline-block;
+    padding: 6px 16px;
+    border-radius: 20px;
+    font-weight: 700;
+    font-size: 0.9rem;
+    letter-spacing: 0.02em;
+    text-align: center;
+}
+
+.tier-advanced {
+    background: rgba(16, 185, 129, 0.15);
+    color: #34D399;
+    border: 1px solid rgba(16, 185, 129, 0.4);
+}
+
+.tier-competent {
+    background: rgba(245, 158, 11, 0.15);
+    color: #FBBF24;
+    border: 1px solid rgba(245, 158, 11, 0.4);
+}
+
+.tier-developing {
+    background: rgba(249, 115, 22, 0.15);
+    color: #FB923C;
+    border: 1px solid rgba(249, 115, 22, 0.4);
+}
+
+.tier-needs-focus {
+    background: rgba(239, 68, 68, 0.15);
+    color: #F87171;
+    border: 1px solid rgba(239, 68, 68, 0.4);
+}
+
+/* Transcript Box */
+.transcript-card {
+    background: #111827;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-left: 4px solid #3B82F6;
+    border-radius: 10px;
+    padding: 1.2rem 1.4rem;
+    font-size: 1rem;
+    line-height: 1.8;
+    color: #E5E7EB;
+    white-space: pre-wrap;
+    min-height: 90px;
+}
+
+.filler-tag {
+    background: rgba(239, 68, 68, 0.2);
+    color: #FCA5A5;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 4px;
+    border: 1px solid rgba(239, 68, 68, 0.35);
+}
+
+/* Benchmark Reference Box */
+.benchmark-box {
+    background: rgba(17, 24, 39, 0.7);
+    border: 1px solid rgba(59, 130, 246, 0.2);
+    border-left: 3px solid #3B82F6;
+    border-radius: 8px;
+    padding: 1rem 1.2rem;
+    font-size: 0.92rem;
+    color: #D1D5DB;
+    line-height: 1.6;
+}
+
+/* Keyword Chips */
+.keyword-chip {
+    display: inline-block;
+    background: rgba(59, 130, 246, 0.12);
+    color: #93C5FD;
+    border: 1px solid rgba(59, 130, 246, 0.25);
+    border-radius: 6px;
+    padding: 2px 9px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    margin: 3px;
+}
+
+.keyword-chip-missed {
+    display: inline-block;
+    background: rgba(245, 158, 11, 0.12);
+    color: #FCD34D;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+    border-radius: 6px;
+    padding: 2px 9px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    margin: 3px;
+}
+
+/* Primary Action Buttons */
+.stButton > button {
+    border-radius: 10px !important;
+    font-weight: 600 !important;
+    transition: all 0.2s ease !important;
+}
+
+/* Sidebar Branding */
+[data-testid="stSidebarHeader"] {
+    padding-bottom: 0.5rem;
+}
