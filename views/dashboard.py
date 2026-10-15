@@ -10,7 +10,7 @@ def render_dashboard():
         <div class="app-header">
             <span class="header-badge">Performance Intelligence</span>
             <h1 class="header-title">Analytics & Assessment Dashboard</h1>
-            <p class="header-subtitle">Aggregate metrics, candidate score distributions, and longitudinal fluency trends across all conceptual voice evaluations.</p>
+            <p class="header-subtitle">Aggregate metrics, candidate score distributions, comparative evaluations, and longitudinal fluency trends across all conceptual voice evaluations.</p>
         </div>
         """,
         unsafe_allow_html=True
@@ -35,7 +35,59 @@ def render_dashboard():
 
     df = pd.DataFrame(evaluations)
 
-    # Filter Controls
+    # =========================================================================
+    # INTERACTIVE SECTION 1: COMPARATIVE ATTEMPT ANALYZER
+    # =========================================================================
+    with st.expander("🔍 Interactive Evaluation Comparator (Compare 2 Attempts Side-by-Side)", expanded=(len(evaluations) >= 2)):
+        st.caption("Select any two past evaluations to compare scores, fluency changes, and filler word reductions:")
+        if len(evaluations) >= 2:
+            eval_options = {f"#{rec['id']} - {rec['concept_name']} ({rec['timestamp']})": rec for rec in evaluations}
+            option_keys = list(eval_options.keys())
+
+            c_cmp1, c_cmp2 = st.columns(2)
+            with c_cmp1:
+                sel_a = st.selectbox("Select Baseline Attempt (A):", option_keys, index=min(1, len(option_keys)-1))
+            with c_cmp2:
+                sel_b = st.selectbox("Select Comparison Attempt (B):", option_keys, index=0)
+
+            rec_a = eval_options[sel_a]
+            rec_b = eval_options[sel_b]
+
+            delta_score = rec_b["overall_score"] - rec_a["overall_score"]
+            delta_sem = rec_b["semantic_score"] - rec_a["semantic_score"]
+            delta_flu = rec_b["fluency_score"] - rec_a["fluency_score"]
+            delta_fillers = rec_b["filler_count"] - rec_a["filler_count"]
+
+            m1, m2, m3, m4 = st.columns(4)
+            m1.metric("Overall Score Delta", f"{rec_b['overall_score']:.1f}", delta=f"{delta_score:+.1f} pts")
+            m2.metric("Semantic Match Delta", f"{rec_b['semantic_score']:.1f}%", delta=f"{delta_sem:+.1f}%")
+            m3.metric("Fluency Score Delta", f"{rec_b['fluency_score']:.1f}%", delta=f"{delta_flu:+.1f}%")
+            m4.metric("Filler Words Difference", f"{rec_b['filler_count']}", delta=f"{delta_fillers:+d}", delta_color="inverse")
+        else:
+            st.info("Record at least 2 evaluations to unlock side-by-side comparative analytics.")
+
+    # =========================================================================
+    # INTERACTIVE SECTION 2: TARGET GOAL TRACKER
+    # =========================================================================
+    with st.expander("🎯 Interactive Target Mastery Goal Tracker", expanded=False):
+        c_gt1, c_gt2 = st.columns([1.5, 1])
+        with c_gt1:
+            target_goal = st.slider("Set Target Mastery Score Threshold:", min_value=50, max_value=95, value=80, step=5)
+            passing_count = len(df[df["overall_score"] >= target_goal])
+            total_count = len(df)
+            pass_rate = (passing_count / total_count) * 100 if total_count > 0 else 0
+
+            st.write(f"Evaluations achieving **>={target_goal}/100**: **{passing_count} of {total_count} ({pass_rate:.1f}%)**")
+            st.progress(pass_rate / 100.0)
+
+        with c_gt2:
+            st.metric("Goal Compliance Rate", f"{pass_rate:.1f}%", delta=f"{passing_count} Reached")
+
+    st.markdown("---")
+
+    # =========================================================================
+    # SECTION 3: TOPIC FILTERS & LONGITUDINAL CHARTS
+    # =========================================================================
     col_filter, col_spacer = st.columns([1.5, 2])
     with col_filter:
         topics = ["All Topics"] + sorted(list(df["concept_name"].unique()))

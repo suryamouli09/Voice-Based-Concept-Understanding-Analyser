@@ -12,7 +12,13 @@ from modules.feature_extractor import extract_audio_features
 from modules.filler_word import analyze_filler_words
 from modules.semantic_eval import semantic_similarity
 from modules.scoring_engine import calculate_final_score
-from modules.feedback_engine import generate_feedback
+from modules.feedback_engine import (
+    generate_feedback,
+    get_topic_prompts,
+    get_topic_coach_answer,
+    get_keyword_flashcard_fact,
+    generate_refined_speech
+)
 from modules.report_generator import generate_pdf_report
 from modules.dashboard import score_gauge, score_bar, radar_score_chart, filler_words_pie
 
@@ -51,38 +57,62 @@ def render_evaluator():
     concepts = load_reference_concepts()
     concept_names = list(concepts.keys())
 
-    # Step 1: Benchmark Concept Selection
+    # =========================================================================
+    # SECTION 1: BENCHMARK CONCEPT & INTERACTIVE PRACTICE PROMPTS
+    # =========================================================================
+    st.markdown("### 1️⃣ Target Concept & Guided Practice")
     col_concept, col_mode = st.columns([1.6, 1])
 
     with col_concept:
         selected_concept = st.selectbox(
-            "🎯 Select Target Benchmark Concept:",
+            "🎯 Select Benchmark Topic to Explain:",
             concept_names,
             index=0,
-            help="Choose the subject matter you are explaining."
+            help="Choose the concept topic for evaluation."
         )
-    
+
     with col_mode:
         st.write("")
         st.write("")
-        show_benchmark = st.toggle("Show Benchmark Reference Definition", value=True)
+        practice_helper = st.toggle("Show Speaking Prompts & Tips", value=True)
 
-    if show_benchmark and selected_concept:
-        c_info = concepts[selected_concept]
-        st.markdown(
-            f"""
-            <div class="benchmark-box">
-                <strong style="color: #60A5FA;">Expected Benchmark Concept ({selected_concept}):</strong><br>
-                <em>"{c_info.get('reference_text', '')}"</em>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
+    # Interactive Guided Speaking Prompts
+    if practice_helper and selected_concept:
+        prompts = get_topic_prompts(selected_concept)
+        ref_text = concepts[selected_concept]["reference_text"]
+
+        c_prompt1, c_prompt2 = st.columns([1.2, 1])
+        with c_prompt1:
+            with st.container(border=True):
+                st.markdown(f"**🎯 3-Part Guided Speaking Prompt for `{selected_concept}`:**")
+                st.caption("Try structuring your answer using these 3 key points:")
+                for p in prompts:
+                    st.markdown(f'<div class="prompt-card"><span class="prompt-step">Prompt</span> {p}</div>', unsafe_allow_html=True)
+
+        with c_prompt2:
+            with st.container(border=True):
+                st.markdown("**⏱️ Target Speaking Goal:**")
+                target_duration = st.select_slider(
+                    "Target Explanation Length:",
+                    options=["30 seconds", "45 seconds (Recommended)", "60 seconds", "90 seconds"],
+                    value="45 seconds (Recommended)"
+                )
+                if "30" in target_duration:
+                    st.info("🎯 **Target:** ~60-75 words. Focus on the core definition and 1 key principle.")
+                elif "45" in target_duration:
+                    st.info("🎯 **Target:** ~95-115 words. Definition + how it works + 1 real example.")
+                else:
+                    st.info("🎯 **Target:** ~130-160 words. In-depth explanation with technical depth.")
+
+                with st.expander("📖 View Ground-Truth Reference Definition"):
+                    st.markdown(f'*" {ref_text} "*')
 
     st.markdown("---")
 
-    # Step 2: Voice Input
-    st.subheader("🎙️ Voice Input")
+    # =========================================================================
+    # SECTION 2: MULTI-MODAL VOICE INPUT & AUDIO INSPECTOR
+    # =========================================================================
+    st.markdown("### 2️⃣ Voice Input & Recording")
     
     tab_mic, tab_upload, tab_sample = st.tabs([
         "🎙️ Record Live Voice",
@@ -94,8 +124,8 @@ def render_evaluator():
     audio_source_label = "voice_input.wav"
 
     with tab_mic:
-        st.caption("Record your spoken explanation directly via your microphone.")
-        mic_audio = st.audio_input("Click to record explanation:")
+        st.caption("Record your spoken explanation directly using your device microphone.")
+        mic_audio = st.audio_input("Click microphone to record explanation:")
         if mic_audio:
             os.makedirs("uploads", exist_ok=True)
             audio_path = os.path.join("uploads", "live_recording.wav")
@@ -115,38 +145,44 @@ def render_evaluator():
             audio_source_label = uploaded_file.name
 
     with tab_sample:
-        st.caption("Don't have audio ready? Test the full pipeline with built-in speech samples:")
+        st.caption("Test the end-to-end evaluation with pre-recorded speech samples:")
         c_s1, c_s2 = st.columns(2)
         with c_s1:
             if st.button("🚀 Load Sample: Machine Learning (Fluent)", use_container_width=True):
                 st.session_state["preset_audio"] = "data/samples/sample_machine_learning.wav"
-                st.session_state["preset_topic"] = "Machine Learning"
                 st.session_state["preset_name"] = "sample_machine_learning.wav"
 
         with c_s2:
-            if st.button("☁️ Load Sample: Cloud Computing (With Fillers)", use_container_width=True):
+            if st.button("☁️ Load Sample: Cloud Computing (With Fillers: um, basically)", use_container_width=True):
                 st.session_state["preset_audio"] = "data/samples/sample_cloud_computing.wav"
-                st.session_state["preset_topic"] = "Cloud Computing"
                 st.session_state["preset_name"] = "sample_cloud_computing.wav"
 
         if "preset_audio" in st.session_state and os.path.exists(st.session_state["preset_audio"]):
             audio_path = st.session_state["preset_audio"]
             audio_source_label = st.session_state.get("preset_name", "sample.wav")
-            st.success(f"Loaded Preset: `{audio_source_label}`")
+            st.success(f"Active Sample: `{audio_source_label}`")
 
-    # Audio Preview
+    # Audio Playback & Preview
     if audio_path and os.path.exists(audio_path):
         with st.container(border=True):
-            st.markdown(f"**🔊 Audio Preview:** `{audio_source_label}`")
-            st.audio(audio_path)
+            col_ap1, col_ap2 = st.columns([2, 1])
+            with col_ap1:
+                st.markdown(f"**🔊 Audio Input Ready:** `{audio_source_label}`")
+                st.audio(audio_path)
+            with col_ap2:
+                file_size_mb = os.path.getsize(audio_path) / (1024 * 1024)
+                st.metric("📦 Audio File Size", f"{file_size_mb:.2f} MB")
+                st.caption("Ready for multi-modal feature extraction.")
 
-        # Trigger Button
+        # Trigger Evaluation
         analyze_btn = st.button("🚀 Run AI Conceptual Evaluation", type="primary", use_container_width=True)
     else:
         analyze_btn = False
         st.info("👆 Please record your voice, upload an audio file, or click a Quick Demo Preset above to proceed.")
 
-    # Execution Pipeline
+    # =========================================================================
+    # PIPELINE EXECUTION
+    # =========================================================================
     if analyze_btn and audio_path:
         with st.status("🧠 Processing Multi-Modal Speech Evaluation...", expanded=True) as status:
             st.write("🎙️ [1/5] Transcribing speech using OpenAI Whisper...")
@@ -176,7 +212,8 @@ def render_evaluator():
                 score_result=score_result,
                 strengths=feedback["strengths"],
                 suggestions=feedback["suggestions"],
-                waveform_path=waveform_path
+                waveform_path=waveform_path,
+                candidate_name=st.session_state.get("custom_candidate_name", "Candidate")
             )
 
             # Save in SQLite
@@ -213,7 +250,9 @@ def render_evaluator():
 
             status.update(label="✅ Conceptual Evaluation Complete!", state="complete", expanded=False)
 
-    # Render Results Section
+    # =========================================================================
+    # SECTION 3: INTERACTIVE RESULTS DASHBOARD
+    # =========================================================================
     if "latest_results" in st.session_state:
         res = st.session_state["latest_results"]
         scores = res["score_result"]
@@ -244,7 +283,64 @@ def render_evaluator():
             with st.container(border=True):
                 st.plotly_chart(score_bar(scores), use_container_width=True)
 
-        # Tabs for In-Depth Analytics
+        # ---------------------------------------------------------------------
+        # INTERACTIVE RUBRIC WEIGHT SIMULATOR (WHAT-IF CALCULATOR)
+        # ---------------------------------------------------------------------
+        with st.expander("⚖️ Interactive Rubric Weight Simulator (What-If Calculator)", expanded=False):
+            st.markdown("Experiment with different evaluation weights to see how your score adapts to various assessment contexts:")
+            
+            c_preset1, c_preset2, c_preset3 = st.columns(3)
+            with c_preset1:
+                if st.button("🎓 Academic Viva (70% Concept / 20% Fluency / 10% Clarity)", use_container_width=True):
+                    st.session_state["w_sem"] = 70
+                    st.session_state["w_flu"] = 20
+                    st.session_state["w_cla"] = 10
+            with c_preset2:
+                if st.button("💼 Tech Interview (50% Concept / 25% Fluency / 25% Clarity)", use_container_width=True):
+                    st.session_state["w_sem"] = 50
+                    st.session_state["w_flu"] = 25
+                    st.session_state["w_cla"] = 25
+            with c_preset3:
+                if st.button("⚖️ Balanced Default (60% Concept / 25% Fluency / 15% Clarity)", use_container_width=True):
+                    st.session_state["w_sem"] = 60
+                    st.session_state["w_flu"] = 25
+                    st.session_state["w_cla"] = 15
+
+            col_w1, col_w2, col_w3 = st.columns(3)
+            with col_w1:
+                w_sem = st.slider("Semantic Alignment Weight (%)", 10, 90, st.session_state.get("w_sem", 60), 5)
+            with col_w2:
+                w_flu = st.slider("Speech Fluency Weight (%)", 10, 90, st.session_state.get("w_flu", 25), 5)
+            with col_w3:
+                w_cla = st.slider("Articulation Clarity Weight (%)", 10, 90, st.session_state.get("w_cla", 15), 5)
+
+            total_weight = w_sem + w_flu + w_cla
+            simulated_score = round(
+                (scores["Semantic Score"] * w_sem + scores["Fluency Score"] * w_flu + scores["Communication Score"] * w_cla) / total_weight,
+                1
+            )
+
+            # Simulated tier
+            if simulated_score >= 85:
+                sim_tier = "Advanced Mastery"
+            elif simulated_score >= 70:
+                sim_tier = "Competent Understanding"
+            elif simulated_score >= 50:
+                sim_tier = "Developing Understanding"
+            else:
+                sim_tier = "Needs Foundational Focus"
+
+            c_sim1, c_sim2 = st.columns([1, 2])
+            with c_sim1:
+                st.metric("Simulated Overall Score", f"{simulated_score} / 100", delta=f"{simulated_score - scores['Final Score']:+.1f} vs Default")
+            with c_sim2:
+                st.markdown(f"**Simulated Tier Under Current Weights:**<br>{render_tier_badge(sim_tier)}", unsafe_allow_html=True)
+
+        st.markdown("---")
+
+        # =====================================================================
+        # 5 DETAILED INTERACTIVE TABS
+        # =====================================================================
         tab_trans, tab_skills, tab_acoustic, tab_coach, tab_export = st.tabs([
             "📝 Transcript & Fillers",
             "🕸️ Competency Radar",
@@ -253,37 +349,80 @@ def render_evaluator():
             "📄 Official PDF Report"
         ])
 
-        # Tab 1: Transcript & Fillers
+        # ---------------------------------------------------------------------
+        # TAB 1: INTERACTIVE TRANSCRIPT & FILLERS
+        # ---------------------------------------------------------------------
         with tab_trans:
-            c_t1, c_t2 = st.columns([1.8, 1])
-            with c_t1:
-                st.markdown("#### Spoken Explanation Transcript")
-                raw_tr = res["transcript"]
-                highlighted_tr = raw_tr
-                # Highlight detected fillers
-                for word in fillers.get("Detected Fillers", {}).keys():
+            raw_tr = res["transcript"]
+            detected_fillers = fillers.get("Detected Fillers", {})
+
+            st.markdown("#### Spoken Explanation Transcript & Lexical Inspector")
+
+            # Interactive Filter Controls
+            c_tf1, c_tf2 = st.columns([1.5, 1])
+            with c_tf1:
+                available_fillers = list(detected_fillers.keys())
+                selected_filler_filters = st.multiselect(
+                    "🎯 Highlight Specific Filler Words:",
+                    options=available_fillers,
+                    default=available_fillers,
+                    help="Select which filler words to flag in red tags in the transcript below."
+                )
+
+            with c_tf2:
+                search_word = st.text_input("🔍 Word Frequency Search:", placeholder="e.g. data, algorithm...")
+
+            # Highlight logic
+            highlighted_tr = raw_tr
+            if selected_filler_filters:
+                for word in selected_filler_filters:
                     pattern = re.compile(r"\b(" + re.escape(word) + r")\b", re.IGNORECASE)
                     highlighted_tr = pattern.sub(r'<span class="filler-tag">\1</span>', highlighted_tr)
 
-                st.markdown(
-                    f'<div class="transcript-card">{highlighted_tr if highlighted_tr else "No transcript detected."}</div>',
-                    unsafe_allow_html=True
-                )
-                st.caption("🚩 Words highlighted in red are detected verbal crutches or fillers.")
+            if search_word.strip():
+                s_pattern = re.compile(r"\b(" + re.escape(search_word.strip()) + r")\b", re.IGNORECASE)
+                occurrences = len(re.findall(s_pattern, raw_tr))
+                highlighted_tr = s_pattern.sub(r'<span class="search-highlight-tag">\1</span>', highlighted_tr)
+                st.info(f"Term **'{search_word}'** found **{occurrences}** times in spoken explanation.")
 
-            with c_t2:
-                st.markdown("#### Filler Words Breakdown")
-                f_count = fillers["Filler Count"]
-                f_ratio = fillers["Filler Ratio"]
-                st.write(f"Total Words Spoken: **{fillers['Total Words']}**")
-                st.write(f"Fillers Flagged: **{f_count}** ({f_ratio}%)")
+            # Display Transcript Box
+            st.markdown(
+                f'<div class="transcript-card">{highlighted_tr if highlighted_tr else "No transcript detected."}</div>',
+                unsafe_allow_html=True
+            )
+            st.caption("🚩 Red tags: Detected verbal crutches  |  🟨 Gold tags: Search matches")
 
-                if fillers["Detected Fillers"]:
-                    st.plotly_chart(filler_words_pie(fillers["Detected Fillers"]), use_container_width=True)
-                else:
-                    st.success("🎉 Flawless! Zero filler words detected.")
+            # Interactive Speech Polish Tool
+            st.markdown("---")
+            with st.expander("✨ Interactive Speech Polish (Executive-Level Delivery)", expanded=False):
+                st.caption("See how an expert or keynote speaker would state your explanation with zero filler words and elevated phrasing:")
+                refined_text = generate_refined_speech(raw_tr, detected_fillers)
+                
+                c_ref1, c_ref2 = st.columns(2)
+                with c_ref1:
+                    st.markdown("**Your Spoken Version:**")
+                    st.markdown(f'<div style="background:#1E293B; padding:12px; border-radius:8px; font-size:0.92rem; color:#94A3B8;">{raw_tr}</div>', unsafe_allow_html=True)
+                with c_ref2:
+                    st.markdown("**Polished Executive Delivery:**")
+                    st.markdown(f'<div style="background:#111827; border-left:3px solid #10B981; padding:12px; border-radius:8px; font-size:0.92rem; color:#E5E7EB;">{refined_text}</div>', unsafe_allow_html=True)
 
-        # Tab 2: Competency Radar
+            # Filler Words Distribution
+            if detected_fillers:
+                st.markdown("#### Filler Word Frequency Breakdown")
+                c_fpie, c_fstats = st.columns([1, 1.2])
+                with c_fpie:
+                    st.plotly_chart(filler_words_pie(detected_fillers), use_container_width=True)
+                with c_fstats:
+                    st.write(f"Total Words Spoken: **{fillers['Total Words']}**")
+                    st.write(f"Fillers Flagged: **{fillers['Filler Count']}** ({fillers['Filler Ratio']}%)")
+                    for w, count in detected_fillers.items():
+                        st.markdown(f"- Verbal crutch **'{w}'**: used **{count}** times")
+            else:
+                st.success("🎉 Flawless! Zero filler words detected in your explanation.")
+
+        # ---------------------------------------------------------------------
+        # TAB 2: COMPETENCY RADAR
+        # ---------------------------------------------------------------------
         with tab_skills:
             c_r1, c_r2 = st.columns([1.4, 1])
             with c_r1:
@@ -304,19 +443,45 @@ def render_evaluator():
                 st.markdown(f"- **Articulation ({scores['Communication Score']}%):** Confidence and hesitation control.")
                 st.markdown(f"- **Acoustic Balance:** Energy and pitch consistency.")
 
-        # Tab 3: Acoustic Dynamics
+        # ---------------------------------------------------------------------
+        # TAB 3: ACOUSTIC DYNAMICS & PACE ARCHETYPE
+        # ---------------------------------------------------------------------
         with tab_acoustic:
             a1, a2, a3, a4 = st.columns(4)
             a1.metric("Duration", f"{feats['Duration']} s")
-            a2.metric("Speech Rate", f"{feats['Speech Rate']} WPM", help="Optimal technical rate: 115-165 WPM")
+            a2.metric("Speech Rate", f"{feats['Speech Rate']} WPM")
             a3.metric("Pause Ratio", f"{feats['Pause Ratio']*100:.1f}%")
             a4.metric("Mean Pitch", f"{feats['Pitch']} Hz")
+
+            # Interactive Pace Archetype Meter
+            st.markdown("#### 🏃 Speech Rate Archetype Meter")
+            wpm = feats["Speech Rate"]
+            
+            if wpm < 105:
+                archetype = "🐢 Deliberate / Hesitant (<105 WPM)"
+                archetype_tip = "Consider increasing tempo to sound more confident and keep listener engagement."
+            elif 105 <= wpm < 130:
+                archetype = "🎓 Academic Lecturer (105-130 WPM)"
+                archetype_tip = "Clear and methodical tempo, suitable for complex introductory concepts."
+            elif 130 <= wpm <= 165:
+                archetype = "🎙️ TED / Executive Speaker (130-165 WPM) - Optimal"
+                archetype_tip = "Outstanding! This is the gold-standard pace for technical presentations."
+            else:
+                archetype = "🏎️ Fast Pitch / Rapid (>165 WPM)"
+                archetype_tip = "Consider slowing down slightly so listeners can absorb dense technical definitions."
+
+            with st.container(border=True):
+                st.markdown(f"**Your Speech Archetype:** `{archetype}`")
+                st.progress(min(1.0, max(0.0, wpm / 200.0)))
+                st.caption(f"💡 **Coach Advice:** {archetype_tip}")
 
             st.markdown("#### Acoustic Waveform Visual")
             if res.get("waveform_path") and os.path.exists(res["waveform_path"]):
                 st.image(res["waveform_path"], use_container_width=True)
 
-        # Tab 4: AI Coaching
+        # ---------------------------------------------------------------------
+        # TAB 4: INTERACTIVE AI COACHING & FLASHCARDS
+        # ---------------------------------------------------------------------
         with tab_coach:
             col_str, col_sug = st.columns(2)
             with col_str:
@@ -328,46 +493,110 @@ def render_evaluator():
             with col_sug:
                 with st.container(border=True):
                     st.markdown("### 🎯 Recommendations for Growth")
-                    for sug_item in fb["suggestions"]:
-                        st.markdown(f"- 💡 **{sug_item}**")
+                    for idx, sug_item in enumerate(fb["suggestions"]):
+                        st.checkbox(f"{sug_item}", key=f"rec_check_{idx}", value=False)
+                    st.caption("Check off items as you practice them for your next attempt!")
 
-            # Keyword Comparison
-            st.markdown("#### 🔍 Technical Vocabulary Alignment")
-            c_k1, c_k2 = st.columns(2)
-            with c_k1:
-                st.write("**Matched Key Concepts:**")
+            # Interactive Concept Flashcards
+            st.markdown("---")
+            st.markdown("#### 📚 Interactive Concept Retention Flashcards")
+            st.caption("Click any keyword to reveal why it is critical for mastering this topic:")
+
+            c_f1, c_f2 = st.columns(2)
+            with c_f1:
+                st.markdown("**Matched Technical Terms:**")
                 if fb["matched_keywords"]:
-                    chips = "".join([f'<span class="keyword-chip">{kw}</span>' for kw in fb["matched_keywords"]])
-                    st.markdown(chips, unsafe_allow_html=True)
+                    for kw in fb["matched_keywords"]:
+                        with st.expander(f"✅ {kw.capitalize()}"):
+                            st.write(get_keyword_flashcard_fact(kw, res["concept"]))
                 else:
                     st.caption("No key vocabulary matches identified.")
 
-            with c_k2:
-                st.write("**Suggested Keywords to Incorporate:**")
+            with c_f2:
+                st.markdown("**Missed Core Concepts to Learn:**")
                 if fb["missed_keywords"]:
-                    chips_m = "".join([f'<span class="keyword-chip-missed">{kw}</span>' for kw in fb["missed_keywords"]])
-                    st.markdown(chips_m, unsafe_allow_html=True)
+                    for kw in fb["missed_keywords"]:
+                        with st.expander(f"💡 {kw.capitalize()} (Learn Fact)"):
+                            st.write(get_keyword_flashcard_fact(kw, res["concept"]))
                 else:
                     st.caption("Excellent coverage of key reference vocabulary.")
 
-        # Tab 5: PDF Report Export
+            # Interactive Ask Coach Tool
+            st.markdown("---")
+            st.markdown("#### 🤖 Ask Concept Coach (Interactive Q&A)")
+            st.caption("Get instant guidance on how to explain this topic effectively:")
+
+            c_q1, c_q2, c_q3 = st.columns(3)
+            q_answer = None
+
+            with c_q1:
+                if st.button("🚀 30s Elevator Pitch", use_container_width=True):
+                    q_answer = get_topic_coach_answer(res["concept"], "pitch")
+            with c_q2:
+                if st.button("💡 Memorable Analogy", use_container_width=True):
+                    q_answer = get_topic_coach_answer(res["concept"], "analogy")
+            with c_q3:
+                if st.button("⚠️ Common Pitfalls to Avoid", use_container_width=True):
+                    q_answer = get_topic_coach_answer(res["concept"], "mistakes")
+
+            if q_answer:
+                st.info(f"**Coach Tip:** {q_answer}")
+
+        # ---------------------------------------------------------------------
+        # TAB 5: INTERACTIVE PDF REPORT CUSTOMIZER
+        # ---------------------------------------------------------------------
         with tab_export:
-            st.markdown("#### Official PDF Assessment Report")
-            st.caption("Download a standardized, formal PDF assessment summary including charts, transcripts, and scores.")
+            st.markdown("#### 📄 Customized Official PDF Assessment Report")
+            st.caption("Personalize report parameters and metadata before generating your formal PDF certificate:")
+
+            with st.container(border=True):
+                col_p1, col_p2 = st.columns(2)
+                with col_p1:
+                    custom_candidate = st.text_input("Candidate / Student Name:", value=st.session_state.get("custom_candidate_name", "Alex Developer"))
+                    st.session_state["custom_candidate_name"] = custom_candidate
+                with col_p2:
+                    custom_org = st.text_input("Organization / Institution:", value="Voice Concept Intelligence Platform")
+
+                c_tog1, c_tog2 = st.columns(2)
+                with c_tog1:
+                    inc_waveform = st.checkbox("Include Acoustic Waveform Graph", value=True)
+                with c_tog2:
+                    inc_coaching = st.checkbox("Include AI Coaching Recommendations", value=True)
+
+                if st.button("🔄 Update & Re-Generate Custom PDF", type="secondary"):
+                    new_pdf_path = generate_pdf_report(
+                        topic=res["concept"],
+                        transcript=res["transcript"],
+                        features=feats,
+                        filler_result=fillers,
+                        semantic_result=sem,
+                        score_result=scores,
+                        strengths=fb["strengths"],
+                        suggestions=fb["suggestions"],
+                        waveform_path=res.get("waveform_path"),
+                        candidate_name=custom_candidate,
+                        evaluator_org=custom_org,
+                        include_waveform=inc_waveform,
+                        include_coaching=inc_coaching
+                    )
+                    res["pdf_path"] = new_pdf_path
+                    st.success("✅ PDF Report updated with custom parameters!")
+
+            # Download Action
             pdf_path = res.get("pdf_path")
             if pdf_path and os.path.exists(pdf_path):
                 with open(pdf_path, "rb") as f:
                     pdf_bytes = f.read()
 
                 st.download_button(
-                    label="📥 Download Official Assessment Report (PDF)",
+                    label=f"📥 Download Assessment Report for '{st.session_state.get('custom_candidate_name', 'Candidate')}' (PDF)",
                     data=pdf_bytes,
                     file_name=os.path.basename(pdf_path),
                     mime="application/pdf",
-                    type="primary"
+                    type="primary",
+                    use_container_width=True
                 )
-                st.success(f"Report Generated: `{os.path.basename(pdf_path)}`")
             else:
-                st.warning("PDF report is not available.")
+                st.warning("PDF report is being generated...")
 
 render_evaluator()
