@@ -63,11 +63,15 @@ def render_evaluator():
     st.markdown("### 1️⃣ Target Concept & Guided Practice")
     col_concept, col_mode = st.columns([1.6, 1])
 
+    current_concept_idx = 0
+    if "selected_concept_override" in st.session_state and st.session_state["selected_concept_override"] in concept_names:
+        current_concept_idx = concept_names.index(st.session_state["selected_concept_override"])
+
     with col_concept:
         selected_concept = st.selectbox(
             "🎯 Select Benchmark Topic to Explain:",
             concept_names,
-            index=0,
+            index=current_concept_idx,
             help="Choose the concept topic for evaluation."
         )
 
@@ -127,23 +131,28 @@ def render_evaluator():
 
     with tab_mic:
         st.caption("Record your spoken explanation directly using your device microphone.")
-        mic_audio = st.audio_input("Click microphone to record explanation:")
-        if mic_audio:
-            os.makedirs("uploads", exist_ok=True)
-            live_path = os.path.join("uploads", "live_recording.wav")
-            with open(live_path, "wb") as f:
-                f.write(mic_audio.getbuffer())
-            st.session_state["active_audio_path"] = live_path
-            st.session_state["active_audio_label"] = "Live Microphone Recording"
+        mic_audio = st.audio_input("Click microphone to record explanation:", key="evaluator_live_mic")
+        if mic_audio is not None:
+            if mic_audio.size > 500:
+                os.makedirs("uploads", exist_ok=True)
+                import uuid
+                live_path = os.path.join("uploads", f"live_{uuid.uuid4().hex[:8]}.wav")
+                with open(live_path, "wb") as f:
+                    f.write(mic_audio.getbuffer())
+                st.session_state["active_audio_path"] = live_path
+                st.session_state["active_audio_label"] = "Live Microphone Recording"
+            else:
+                st.warning("⚠️ Recording was empty (0 bytes). Please ensure microphone access is allowed in your browser.")
 
     with tab_upload:
         st.caption("Upload a pre-recorded audio file (WAV, MP3, M4A, OGG).")
         uploaded_file = st.file_uploader(
             "Choose audio file",
             type=["wav", "mp3", "m4a", "ogg"],
+            key="evaluator_file_upload",
             label_visibility="collapsed"
         )
-        if uploaded_file is not None:
+        if uploaded_file is not None and uploaded_file.size > 500:
             up_path = save_uploaded_audio(uploaded_file)
             st.session_state["active_audio_path"] = up_path
             st.session_state["active_audio_label"] = uploaded_file.name
@@ -152,22 +161,24 @@ def render_evaluator():
         st.caption("Test the end-to-end evaluation with pre-recorded speech samples:")
         c_s1, c_s2 = st.columns(2)
         with c_s1:
-            if st.button("🚀 Load Sample: Machine Learning (Fluent)", use_container_width=True):
+            if st.button("🚀 Load Sample: Machine Learning (Fluent)", key="btn_sample_ml", use_container_width=True):
                 st.session_state["active_audio_path"] = "data/samples/sample_machine_learning.wav"
                 st.session_state["active_audio_label"] = "sample_machine_learning.wav (Fluent)"
+                st.session_state["selected_concept_override"] = "Machine Learning"
                 st.rerun()
 
         with c_s2:
-            if st.button("☁️ Load Sample: Cloud Computing (With Fillers: um, basically)", use_container_width=True):
+            if st.button("☁️ Load Sample: Cloud Computing (With Fillers: um, basically)", key="btn_sample_cloud", use_container_width=True):
                 st.session_state["active_audio_path"] = "data/samples/sample_cloud_computing.wav"
                 st.session_state["active_audio_label"] = "sample_cloud_computing.wav (With Fillers)"
+                st.session_state["selected_concept_override"] = "Cloud Computing"
                 st.rerun()
 
     audio_path = st.session_state.get("active_audio_path")
     audio_source_label = st.session_state.get("active_audio_label", "voice_input.wav")
 
     # Audio Playback & Preview
-    if audio_path and os.path.exists(audio_path):
+    if audio_path and os.path.exists(audio_path) and os.path.getsize(audio_path) > 500:
         with st.container(border=True):
             col_ap1, col_ap2 = st.columns([2, 1])
             with col_ap1:
@@ -179,10 +190,10 @@ def render_evaluator():
                 st.caption("Ready for multi-modal feature extraction.")
 
         # Trigger Evaluation
-        analyze_btn = st.button("🚀 Run AI Conceptual Evaluation", type="primary", use_container_width=True)
+        analyze_btn = st.button("🚀 Run AI Conceptual Evaluation", type="primary", key="btn_run_evaluation", use_container_width=True)
     else:
         analyze_btn = False
-        st.info("👆 Please record your voice, upload an audio file, or click a Quick Demo Preset above to proceed.")
+        st.info("👆 **No active audio input selected:** Record your voice above, upload an audio file, or click a **Quick Demo Preset**.")
 
     # =========================================================================
     # PIPELINE EXECUTION
@@ -257,7 +268,8 @@ def render_evaluator():
                     "pdf_path": pdf_report_path
                 }
 
-                status.update(label="✅ Conceptual Evaluation Complete!", state="complete", expanded=False)
+                status.update(label="✅ Conceptual Evaluation Complete! Scroll down to explore your dashboard.", state="complete", expanded=True)
+                st.toast("🎉 Evaluation Complete! View results below.", icon="✅")
             except Exception as e:
                 import traceback
                 err_tb = traceback.format_exc()

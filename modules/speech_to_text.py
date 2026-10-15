@@ -51,6 +51,10 @@ def transcribe_audio(audio_path: str, model_size: str = "tiny") -> str:
     if not os.path.exists(audio_path):
         raise FileNotFoundError(f"Audio file not found: {audio_path}")
 
+    # Guard against 0-byte or empty audio recordings
+    if os.path.getsize(audio_path) < 500:
+        return ""
+
     # Allow environment override if specified
     active_model = os.getenv("WHISPER_MODEL", model_size)
     model = _load_whisper_model(active_model)

@@ -11,6 +11,8 @@ def save_uploaded_audio(uploaded_file):
     return file_path
 
 def get_audio_info(file_path):
+    if not os.path.exists(file_path) or os.path.getsize(file_path) < 500:
+        return 0.0, 0.0
     size = round(os.path.getsize(file_path) / (1024 * 1024), 2)
     try:
         y, sr = librosa.load(file_path, sr=None)
@@ -20,12 +22,21 @@ def get_audio_info(file_path):
     return size, duration
 
 def generate_waveform(file_path):
-    y, sr = librosa.load(file_path, sr=None, mono=True)
-
     os.makedirs("outputs/graphs", exist_ok=True)
     waveform_path = os.path.join("outputs", "graphs", "waveform.png")
 
-    time = np.arange(len(y)) / sr
+    try:
+        if not os.path.exists(file_path) or os.path.getsize(file_path) < 500:
+            raise ValueError("File too small or nonexistent.")
+        y, sr = librosa.load(file_path, sr=None, mono=True)
+        if len(y) == 0:
+            raise ValueError("Empty audio signal.")
+        time = np.arange(len(y)) / sr
+    except Exception:
+        # Graceful placeholder signal for silent/empty recordings
+        sr = 16000
+        y = np.zeros(sr)
+        time = np.linspace(0, 1, sr)
 
     plt.style.use('dark_background')
     fig, ax = plt.subplots(figsize=(12, 3), facecolor='#111827')

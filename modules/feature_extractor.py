@@ -11,7 +11,22 @@ def extract_audio_features(audio_path: str, transcript: str = "") -> dict:
     - Pause / Silence Ratio
     - Mean Pitch (Hz)
     """
-    y, sr = librosa.load(audio_path, sr=None)
+    if not os.path.exists(audio_path) or os.path.getsize(audio_path) < 500:
+        return {
+            "Duration": 0.0,
+            "Speech Rate": 0.0,
+            "RMS Energy": 0.0,
+            "Zero Crossing Rate": 0.0,
+            "Silence Ratio": 0.0,
+            "Pause Ratio": 0.0,
+            "Pitch": 0.0
+        }
+
+    try:
+        y, sr = librosa.load(audio_path, sr=None)
+    except Exception:
+        y = np.zeros(16000)
+        sr = 16000
 
     total_samples = len(y)
     duration = float(librosa.get_duration(y=y, sr=sr)) if total_samples > 0 else 0.0

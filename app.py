@@ -68,5 +68,11 @@ with st.sidebar:
     st.markdown("## 🎙️ **VBCUA**")
     st.caption("Speech Intelligence & Concept Evaluator")
     st.markdown("---")
+    with st.expander("⚙️ System Status & Reset", expanded=False):
+        st.caption("Engine: Whisper (Cloud-Optimized) + SBERT")
+        if st.button("🧹 Reset Active Session", use_container_width=True):
+            for k in list(st.session_state.keys()):
+                del st.session_state[k]
+            st.rerun()
 
 pg.run()
