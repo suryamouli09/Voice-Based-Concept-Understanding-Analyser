@@ -15,6 +15,7 @@ env/
 # Outputs & Reports
 outputs/reports/*.pdf
 outputs/transcripts/*.txt
+outputs/graphs/*.png
 
 # User Uploads
 uploads/*

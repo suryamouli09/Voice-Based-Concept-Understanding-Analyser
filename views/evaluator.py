@@ -120,18 +120,21 @@ def render_evaluator():
         "⚡ Quick Demo Presets"
     ])
 
-    audio_path = None
-    audio_source_label = "voice_input.wav"
+    if "active_audio_path" not in st.session_state:
+        st.session_state["active_audio_path"] = None
+    if "active_audio_label" not in st.session_state:
+        st.session_state["active_audio_label"] = "voice_input.wav"
 
     with tab_mic:
         st.caption("Record your spoken explanation directly using your device microphone.")
         mic_audio = st.audio_input("Click microphone to record explanation:")
         if mic_audio:
             os.makedirs("uploads", exist_ok=True)
-            audio_path = os.path.join("uploads", "live_recording.wav")
-            with open(audio_path, "wb") as f:
+            live_path = os.path.join("uploads", "live_recording.wav")
+            with open(live_path, "wb") as f:
                 f.write(mic_audio.getbuffer())
-            audio_source_label = "live_mic_recording.wav"
+            st.session_state["active_audio_path"] = live_path
+            st.session_state["active_audio_label"] = "Live Microphone Recording"
 
     with tab_upload:
         st.caption("Upload a pre-recorded audio file (WAV, MP3, M4A, OGG).")
@@ -140,27 +143,28 @@ def render_evaluator():
             type=["wav", "mp3", "m4a", "ogg"],
             label_visibility="collapsed"
         )
-        if uploaded_file:
-            audio_path = save_uploaded_audio(uploaded_file)
-            audio_source_label = uploaded_file.name
+        if uploaded_file is not None:
+            up_path = save_uploaded_audio(uploaded_file)
+            st.session_state["active_audio_path"] = up_path
+            st.session_state["active_audio_label"] = uploaded_file.name
 
     with tab_sample:
         st.caption("Test the end-to-end evaluation with pre-recorded speech samples:")
         c_s1, c_s2 = st.columns(2)
         with c_s1:
             if st.button("🚀 Load Sample: Machine Learning (Fluent)", use_container_width=True):
-                st.session_state["preset_audio"] = "data/samples/sample_machine_learning.wav"
-                st.session_state["preset_name"] = "sample_machine_learning.wav"
+                st.session_state["active_audio_path"] = "data/samples/sample_machine_learning.wav"
+                st.session_state["active_audio_label"] = "sample_machine_learning.wav (Fluent)"
+                st.rerun()
 
         with c_s2:
             if st.button("☁️ Load Sample: Cloud Computing (With Fillers: um, basically)", use_container_width=True):
-                st.session_state["preset_audio"] = "data/samples/sample_cloud_computing.wav"
-                st.session_state["preset_name"] = "sample_cloud_computing.wav"
+                st.session_state["active_audio_path"] = "data/samples/sample_cloud_computing.wav"
+                st.session_state["active_audio_label"] = "sample_cloud_computing.wav (With Fillers)"
+                st.rerun()
 
-        if "preset_audio" in st.session_state and os.path.exists(st.session_state["preset_audio"]):
-            audio_path = st.session_state["preset_audio"]
-            audio_source_label = st.session_state.get("preset_name", "sample.wav")
-            st.success(f"Active Sample: `{audio_source_label}`")
+    audio_path = st.session_state.get("active_audio_path")
+    audio_source_label = st.session_state.get("active_audio_label", "voice_input.wav")
 
     # Audio Playback & Preview
     if audio_path and os.path.exists(audio_path):
@@ -185,70 +189,83 @@ def render_evaluator():
     # =========================================================================
     if analyze_btn and audio_path:
         with st.status("🧠 Processing Multi-Modal Speech Evaluation...", expanded=True) as status:
-            st.write("🎙️ [1/5] Transcribing speech using OpenAI Whisper...")
-            transcript = transcribe_audio(audio_path)
+            try:
+                st.write("🎙️ [1/5] Transcribing speech using OpenAI Whisper...")
+                transcript = transcribe_audio(audio_path)
 
-            st.write("🎧 [2/5] Extracting acoustic DSP features (WPM, pitch, pauses) via Librosa...")
-            features = extract_audio_features(audio_path, transcript)
-            waveform_path = generate_waveform(audio_path)
+                if not transcript or not transcript.strip():
+                    transcript = "No distinct spoken explanation was detected in the audio file."
+                    st.warning("⚠️ Microphone input was very low or unclear. Analyzing acoustic signal and continuing.")
 
-            st.write("💬 [3/5] Detecting speech hesitations and filler word patterns...")
-            filler_result = analyze_filler_words(transcript)
+                st.write("🎧 [2/5] Extracting acoustic DSP features (WPM, pitch, pauses) via Librosa...")
+                features = extract_audio_features(audio_path, transcript)
+                waveform_path = generate_waveform(audio_path)
 
-            st.write("🧠 [4/5] Computing Sentence-BERT dense vector semantic alignment...")
-            benchmark_text = concepts[selected_concept]["reference_text"]
-            semantic_result = semantic_similarity(transcript, benchmark_text)
+                st.write("💬 [3/5] Detecting speech hesitations and filler word patterns...")
+                filler_result = analyze_filler_words(transcript)
 
-            st.write("📊 [5/5] Synthesizing multidimensional score and generating report...")
-            score_result = calculate_final_score(features, filler_result, semantic_result)
-            feedback = generate_feedback(score_result, filler_result, features, transcript, benchmark_text)
+                st.write("🧠 [4/5] Computing Sentence-BERT dense vector semantic alignment...")
+                benchmark_text = concepts[selected_concept]["reference_text"]
+                semantic_result = semantic_similarity(transcript, benchmark_text)
 
-            pdf_report_path = generate_pdf_report(
-                topic=selected_concept,
-                transcript=transcript,
-                features=features,
-                filler_result=filler_result,
-                semantic_result=semantic_result,
-                score_result=score_result,
-                strengths=feedback["strengths"],
-                suggestions=feedback["suggestions"],
-                waveform_path=waveform_path,
-                candidate_name=st.session_state.get("custom_candidate_name", "Candidate")
-            )
+                st.write("📊 [5/5] Synthesizing multidimensional score and generating report...")
+                score_result = calculate_final_score(features, filler_result, semantic_result)
+                feedback = generate_feedback(score_result, filler_result, features, transcript, benchmark_text)
 
-            # Save in SQLite
-            save_evaluation(
-                filename=audio_source_label,
-                concept_name=selected_concept,
-                overall_score=score_result["Final Score"],
-                grade=score_result["Grade"],
-                semantic_score=score_result["Semantic Score"],
-                fluency_score=score_result["Fluency Score"],
-                communication_score=score_result["Communication Score"],
-                transcript=transcript,
-                filler_count=filler_result["Filler Count"],
-                pdf_report_path=pdf_report_path,
-                meta_dict={
-                    "fillers": filler_result["Detected Fillers"],
-                    "wpm": features["Speech Rate"],
-                    "matched_keywords": feedback["matched_keywords"]
+                pdf_report_path = generate_pdf_report(
+                    topic=selected_concept,
+                    transcript=transcript,
+                    features=features,
+                    filler_result=filler_result,
+                    semantic_result=semantic_result,
+                    score_result=score_result,
+                    strengths=feedback["strengths"],
+                    suggestions=feedback["suggestions"],
+                    waveform_path=waveform_path,
+                    candidate_name=st.session_state.get("custom_candidate_name", "Candidate")
+                )
+
+                # Save in SQLite
+                save_evaluation(
+                    filename=audio_source_label,
+                    concept_name=selected_concept,
+                    overall_score=score_result["Final Score"],
+                    grade=score_result["Grade"],
+                    semantic_score=score_result["Semantic Score"],
+                    fluency_score=score_result["Fluency Score"],
+                    communication_score=score_result["Communication Score"],
+                    transcript=transcript,
+                    filler_count=filler_result["Filler Count"],
+                    pdf_report_path=pdf_report_path,
+                    meta_dict={
+                        "fillers": filler_result["Detected Fillers"],
+                        "wpm": features["Speech Rate"],
+                        "matched_keywords": feedback["matched_keywords"]
+                    }
+                )
+
+                # Store in session state for persistence
+                st.session_state["latest_results"] = {
+                    "concept": selected_concept,
+                    "transcript": transcript,
+                    "features": features,
+                    "filler_result": filler_result,
+                    "semantic_result": semantic_result,
+                    "score_result": score_result,
+                    "feedback": feedback,
+                    "waveform_path": waveform_path,
+                    "pdf_path": pdf_report_path
                 }
-            )
 
-            # Store in session state for persistence
-            st.session_state["latest_results"] = {
-                "concept": selected_concept,
-                "transcript": transcript,
-                "features": features,
-                "filler_result": filler_result,
-                "semantic_result": semantic_result,
-                "score_result": score_result,
-                "feedback": feedback,
-                "waveform_path": waveform_path,
-                "pdf_path": pdf_report_path
-            }
-
-            status.update(label="✅ Conceptual Evaluation Complete!", state="complete", expanded=False)
+                status.update(label="✅ Conceptual Evaluation Complete!", state="complete", expanded=False)
+            except Exception as e:
+                import traceback
+                err_tb = traceback.format_exc()
+                status.update(label=f"❌ Evaluation Error: {e}", state="error", expanded=True)
+                st.error(f"**Pipeline Error Occurred:** {e}")
+                with st.expander("🔍 Diagnostic Details & Traceback", expanded=True):
+                    st.code(err_tb, language="python")
+                    st.info("💡 **Streamlit Cloud Note:** If you recently pushed new packages, click **Manage app -> '...' -> Reboot app** to make sure Linux OS packages are installed.")
 
     # =========================================================================
     # SECTION 3: INTERACTIVE RESULTS DASHBOARD
