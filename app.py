@@ -75,4 +75,10 @@ with st.sidebar:
                 del st.session_state[k]
             st.rerun()
 
-pg.run()
+try:
+    pg.run()
+except Exception as e:
+    import traceback
+    st.error(f"⚠️ **Application Initialization Error:** {e}")
+    with st.expander("🔍 View Technical Diagnostics", expanded=True):
+        st.code(traceback.format_exc(), language="python")
