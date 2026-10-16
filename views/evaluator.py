@@ -1,7 +1,6 @@
 import os
 import re
 import streamlit as st
-from pathlib import Path
 
 from utils.helper import load_reference_concepts
 from database.db import save_evaluation
@@ -470,7 +469,7 @@ def render_evaluator():
                 st.markdown(f"- **Semantic Alignment ({scores['Semantic Score']}%):** Directness and technical depth compared to reference.")
                 st.markdown(f"- **Speech Cadence ({scores['Fluency Score']}%):** Speaking speed consistency ({feats['Speech Rate']} WPM).")
                 st.markdown(f"- **Articulation ({scores['Communication Score']}%):** Confidence and hesitation control.")
-                st.markdown(f"- **Acoustic Balance:** Energy and pitch consistency.")
+                st.markdown("- **Acoustic Balance:** Energy and pitch consistency.")
 
         # ---------------------------------------------------------------------
         # TAB 3: ACOUSTIC DYNAMICS & PACE ARCHETYPE

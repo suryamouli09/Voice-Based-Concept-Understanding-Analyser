@@ -129,7 +129,6 @@ def generate_feedback(score_result: dict, filler_result: dict, audio_features: d
     suggestions = []
     
     semantic_score = score_result.get("Semantic Score", 0.0)
-    fluency_score = score_result.get("Fluency Score", 0.0)
     speech_rate = audio_features.get("Speech Rate", 0.0)
     pause_ratio = audio_features.get("Pause Ratio", 0.0)
     filler_count = filler_result.get("Filler Count", 0)

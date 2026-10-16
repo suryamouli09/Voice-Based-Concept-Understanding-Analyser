@@ -1,6 +1,5 @@
 import os
 import streamlit as st
-import pandas as pd
 from database.db import get_all_evaluations, delete_evaluation, clear_all_history
 
 def render_history():
