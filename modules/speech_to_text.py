@@ -33,6 +33,11 @@ def load_audio_array(audio_path: str) -> np.ndarray:
     # If both in-memory decoders fail, return None so Whisper can try native path loading
     return None
 
+import gc
+import torch
+
+torch.set_num_threads(2)
+
 @st.cache_resource(show_spinner="Loading Whisper Speech Recognition Engine...")
 def _load_whisper_model(model_name: str = "tiny"):
     """
@@ -61,13 +66,15 @@ def transcribe_audio(audio_path: str, model_size: str = "tiny") -> str:
     # 1. Attempt decoding into memory array to bypass system ffmpeg requirement
     audio_data = load_audio_array(audio_path)
 
-    if audio_data is not None and len(audio_data) > 0:
-        result = model.transcribe(audio_data, fp16=False)
-    else:
-        # 2. Fallback to file path transcription (requires ffmpeg installed)
-        result = model.transcribe(audio_path, fp16=False)
+    with torch.inference_mode():
+        if audio_data is not None and len(audio_data) > 0:
+            result = model.transcribe(audio_data, fp16=False)
+        else:
+            # 2. Fallback to file path transcription (requires ffmpeg installed)
+            result = model.transcribe(audio_path, fp16=False)
 
     transcript = result.get("text", "").strip()
+    gc.collect()
 
     # Save transcript backup
     os.makedirs("outputs/transcripts", exist_ok=True)
